@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The EigenPete | Graph Theory x Greyhound Pedigree Analysis</title>
+<meta name="description" content="We turned an Irish greyhound's 1,828-ancestor pedigree into a 477-node network and used eigenvector centrality to find the most important dog in his bloodline.">
+<meta property="og:title" content="The EigenPete: Graph Theory Meets Greyhound Breeding">
+<meta property="og:description" content="We turned an Irish greyhound's 1,828-ancestor pedigree into a 477-node network and used eigenvector centrality to find the most important dog in his bloodline.">
+<meta property="og:type" content="article">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Serif+Display&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'DM Sans',sans-serif;background:#0a0f0a;color:#d4e4d4;min-height:100vh}
+
+  .hero{text-align:center;padding:48px 24px 32px;border-bottom:1px solid #1a2e1a}
+  .hero h1{font-family:'DM Serif Display',serif;font-size:52px;color:#a5d6a7;letter-spacing:-1px;margin-bottom:8px}
+  .hero h1 span{color:#f9a825}
+  .hero .subtitle{font-size:16px;color:#6a8f6a;margin-bottom:24px}
+  .winner-card{display:inline-flex;align-items:center;gap:20px;background:linear-gradient(135deg,#1a2e1a,#162216);border:2px solid #388e3c;border-radius:16px;padding:20px 36px}
+  .winner-card .crown{font-size:48px}
+  .winner-card .info h2{font-family:'DM Serif Display',serif;font-size:32px;color:#a5d6a7;text-align:left}
+  .winner-card .info p{color:#6a8f6a;font-size:14px;text-align:left;margin-top:4px}
+  .winner-card .score{font-size:42px;font-weight:900;color:#388e3c;letter-spacing:-2px}
+
+  .container{display:flex;max-width:1440px;margin:0 auto}
+  .graph-panel{flex:1;position:relative;min-height:720px;border-right:1px solid #1a2e1a}
+  .graph-panel svg{width:100%;height:100%}
+  .graph-title{position:absolute;top:16px;left:20px;font-size:13px;color:#4a6a4a;pointer-events:none;line-height:1.6}
+  .graph-title strong{color:#6a8f6a}
+  .side-panel{width:420px;padding:28px;overflow-y:auto;max-height:90vh;background:#0d120d}
+
+  .cb{background:#121c12;border:1px solid #1a2e1a;border-radius:12px;padding:20px;margin-bottom:24px}
+  .cb h3{font-family:'DM Serif Display',serif;font-size:20px;color:#a5d6a7;margin-bottom:12px}
+  .cb p{font-size:13px;line-height:1.75;color:#8aaa8a;margin-bottom:12px}
+  .cb p:last-child{margin-bottom:0}
+  .cb strong{color:#c8e6c9}
+  .cb em{color:#a5d6a7;font-style:normal;font-weight:600}
+  .cb code{background:#1a2e1a;padding:2px 6px;border-radius:3px;font-size:12px;color:#a5d6a7}
+  .co{background:#0a150a;border-left:3px solid #388e3c;border-radius:0 8px 8px 0;padding:12px 14px;margin:14px 0;font-size:12.5px;color:#7a9a7a;line-height:1.7}
+  .co strong{color:#a5d6a7}
+
+  .rs{margin-bottom:24px}
+  .rs h3{font-family:'DM Serif Display',serif;font-size:18px;color:#a5d6a7;margin-bottom:4px}
+  .rs .q{font-size:12px;color:#f9a825;margin-bottom:12px;font-style:italic}
+  .rr{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #0f1a0f}
+  .rn{width:22px;font-size:11px;font-weight:700;color:#4a6a4a;text-align:right}
+  .rm{flex:1;font-size:13px;font-weight:600;color:#d4e4d4}
+  .rm .yr{font-weight:400;color:#5a7a5a;font-size:11px}
+  .rm .aus{color:#f9a825}
+  .bw{width:100px;height:8px;background:#1a2e1a;border-radius:4px}
+  .br{height:100%;border-radius:4px}
+  .sc{width:50px;font-size:11px;color:#5a7a5a;text-align:right;font-variant-numeric:tabular-nums}
+  .rr:first-child .rm{color:#a5d6a7}
+
+  .lr{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12px;color:#6a8f6a}
+  .ld{width:10px;height:10px;border-radius:50%}
+
+  .tt{position:fixed;pointer-events:none;opacity:0;background:#1a2e1a;border:1px solid #388e3c;border-radius:8px;padding:12px 16px;font-size:12px;color:#d4e4d4;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:100;max-width:280px;transition:opacity .15s}
+  .tt .tn{font-weight:700;font-size:14px;color:#a5d6a7;margin-bottom:4px}
+  .tt .ts{color:#f9a825}
+  .tt .tw{color:#6a8f6a;margin-top:4px;font-size:11px;line-height:1.5}
+
+  /* ── Mobile responsive ──────────────────────────── */
+  @media(max-width:1024px){
+    .container{flex-direction:column}
+    .graph-panel{min-height:500px;border-right:none;border-bottom:1px solid #1a2e1a}
+    .side-panel{width:100%;max-height:none;padding:24px 20px}
+  }
+  @media(max-width:640px){
+    .hero{padding:32px 16px 24px}
+    .hero h1{font-size:36px}
+    .hero .subtitle{font-size:14px;margin-bottom:16px}
+    .winner-card{flex-direction:column;gap:12px;padding:16px 24px;text-align:center}
+    .winner-card .info h2{font-size:24px;text-align:center}
+    .winner-card .info p{text-align:center;font-size:12px}
+    .winner-card .score{font-size:36px}
+    .graph-panel{min-height:400px}
+    .graph-title{font-size:11px;top:10px;left:12px}
+    .cb{padding:16px}
+    .cb h3{font-size:18px}
+    .cb p{font-size:12px}
+    .co{font-size:11.5px;padding:10px 12px}
+    .rs h3{font-size:16px}
+    .rm{font-size:12px}
+    .bw{width:70px}
+    .side-panel{padding:20px 16px}
+  }
+  @media(max-width:400px){
+    .hero h1{font-size:28px}
+    .graph-panel{min-height:340px}
+    .bw{width:50px}
+  }
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>The <span>Eigen</span>Pete</h1>
+  <p class="subtitle">If Pete's bloodline were a solar system, which dog would be the sun?</p>
+  <div class="winner-card"><div class="crown">&#x1F451;</div><div class="info"><h2>BEST MAN</h2><p>White/Brindle &#183; Whelped 1975 &#183; Appears 26&#215; in Pete's tree</p></div><div class="score">.362</div></div>
+</div>
+<div class="container">
+  <div class="graph-panel" id="G"><div class="graph-title"><strong>Pete's Genetic Solar System</strong><br>BEST MAN at centre. Circle size = eigenvector centrality.<br>Hover for details. Drag to rearrange.</div></div>
+  <div class="side-panel" id="S"></div>
+</div>
+<div class="tt" id="T"></div>
+<script>
+const E=[{n:"BEST MAN",y:"1975",s:.362,a:0,r:"The EigenPete. Connected to 6 of the top 15. The Kevin Bacon of Kerry coursing."},{n:"SMOKEY FLAVOUR",y:"1976",s:.234,a:0,r:"BEST MAN's right hand. Mother of champions, appears 16x in Pete's tree."},{n:"HEATHER POINT",y:"1969",s:.179,a:0,r:"BEST MAN's father. The generation that made BEST MAN who he was."},{n:"FIVE TO EIGHT",y:"1979",s:.175,a:0,r:"Daughter of BEST MAN x SMOKEY FLAVOUR. The power couple's legacy."},{n:"SWANKY STAR",y:"1982",s:.163,a:0,r:"Son of BEST MAN. Carried the bloodline into the 1980s."},{n:"BALLYGLASS LUNDY",y:"1974",s:.159,a:0,r:"Appears 37x. Most repeated dog in the tree, but only #6 eigen."},{n:"CAREFUL PAT",y:"1972",s:.142,a:0,r:"Key link between BALLYGLASS LUNDY and the SMOKEY line."},{n:"CRAFTY THRILLER",y:"1983",s:.139,a:0,r:"Appears 12x across both sire and dam side. A true crossroads dog."},{n:"FLYING MERRY",y:"1969",s:.128,a:0,r:"Same era as HEATHER POINT. Another pillar of the 1960s foundation."},{n:"CUNNING MOVER",y:"1985",s:.120,a:0,r:"Granddaughter of BEST MAN. Passed his influence to the next wave."},{n:"FREDDIES DREAMER",y:"1983",s:.120,a:0,r:"Another BEST MAN descendant keeping the lineage alive."},{n:"SMOKEY KATE",y:"1981",s:.119,a:0,r:"Daughter of BEST MAN x SMOKEY EYES. The Smokey dynasty continues."},{n:"BETTER GET ON",y:"1971",s:.115,a:0,r:"BEST MAN's mother. Without her, no EigenPete."},{n:"LONG BAR",y:"1978",s:.112,a:0,r:"Daughter of BEST MAN. Another branch of his sprawling family."},{n:"BLACKSMITH KITTY",y:"1978",s:.111,a:0,r:"Connected through both CAREFUL PAT and SMOKEY FLAVOUR."}];
+const B=[{n:"MONALEE CHAMPION",y:"1964",s:.218,a:0,r:"The ancient patriarch. Remove him and the graph splits apart."},{n:"BABY HAZEL",y:"2002",s:.125,a:0,r:"The bridge bringing Australian blood into Irish lines."},{n:"HONCHO CLASSIC",y:"1997",s:.116,a:1,r:"Australian import. Only path to the Mugavin bloodlines."},{n:"BEST MAN",y:"1975",s:.107,a:0,r:"EigenPete AND a top bridge. The complete package."},{n:"CRAFTY THRILLER",y:"1983",s:.080,a:0,r:"Connects Kerry breeders to the Galway/Limerick lines."},{n:"SURE LASS ASB",y:"1993",s:.077,a:1,r:"Dam of HONCHO CLASSIC. Gateway to Australian dam lines."},{n:"ASHCARNE FLOJO",y:"1998",s:.076,a:0,r:"Connects Staplers Jo line to the Maguire/Clare breeders."},{n:"BALLYGLASS LUNDY",y:"1974",s:.072,a:0,r:"37 appearances. Most prolific connector in the tree."},{n:"JAMAICA JANE",y:"2009",s:.069,a:0,r:"Pete's grandmother. Funnels ALL Australian blood into Pete."},{n:"GAILY NOBLE",y:"1974",s:.062,a:0,r:"Son of MONALEE CHAMPION. Carried the patriarch's genes forward."}];
+const P=[{n:"BALLYMORE PETE",y:"2020",s:.055},{n:"DRIVE ON SMOKEY",y:"2014",s:.034},{n:"MOAT NANCY",y:"2016",s:.030},{n:"JAMAICA JANE",y:"2009",s:.029},{n:"NEWINN WONDER",y:"2011",s:.022},{n:"BABY HAZEL",y:"2002",s:.019},{n:"NEWINN ALL IN",y:"2008",s:.015},{n:"ASHCARNE FLOJO",y:"1998",s:.015},{n:"BALLYMAC MAEVE",y:"2004",s:.014},{n:"MOAT BELLE",y:"2008",s:.013}];
+
+const NN=[
+  {id:"BEST MAN",ri:0,an:0,ei:.362,au:0,y:"1975",lb:"THE EIGENPETE"},
+  {id:"HEATHER POINT",ri:1,an:-45,ei:.179,au:0,y:"1969",lb:"Father of BEST MAN"},
+  {id:"BETTER GET ON",ri:1,an:45,ei:.115,au:0,y:"1971",lb:"Mother of BEST MAN"},
+  {id:"SMOKEY FLAVOUR",ri:1,an:120,ei:.234,au:0,y:"1976",lb:"Key breeding partner"},
+  {id:"SWANKY STAR",ri:1,an:-120,ei:.163,au:0,y:"1982",lb:"Son of BEST MAN"},
+  {id:"FIVE TO EIGHT",ri:2,an:85,ei:.175,au:0,y:"1979",lb:"BEST MAN x SMOKEY FLAVOUR"},
+  {id:"BALLYGLASS LUNDY",ri:2,an:-15,ei:.159,au:0,y:"1974",lb:"37 appearances. #1 most repeated."},
+  {id:"CAREFUL PAT",ri:2,an:30,ei:.142,au:0,y:"1972",lb:"Links Lundy to the Smokeys"},
+  {id:"CRAFTY THRILLER",ri:2,an:155,ei:.139,au:0,y:"1983",lb:"12x both sides of Pete's tree"},
+  {id:"FLYING MERRY",ri:2,an:-65,ei:.128,au:0,y:"1969",lb:"1960s foundation sire"},
+  {id:"MONALEE CHAMPION",ri:2,an:-145,ei:.08,au:0,y:"1964",lb:"#1 betweenness. The patriarch."},
+  {id:"LONG BAR",ri:2,an:-95,ei:.112,au:0,y:"1978",lb:"Daughter of BEST MAN"},
+  {id:"SMOKEY KATE",ri:2,an:130,ei:.119,au:0,y:"1981",lb:"BEST MAN x SMOKEY EYES"},
+  {id:"BALLYMORE PETE",ri:3,an:0,ei:.03,au:0,y:"2020",lb:"The boy himself"},
+  {id:"JAMAICA JANE",ri:3,an:35,ei:.04,au:0,y:"2009",lb:"Pete's grandmother"},
+  {id:"HONCHO CLASSIC",ri:3,an:65,ei:.05,au:1,y:"1997",lb:"Australian import"},
+  {id:"ROANOKEE",ri:3,an:-35,ei:.04,au:1,y:"1994",lb:"Australian import"},
+  {id:"DRIVE ON SMOKEY",ri:3,an:-12,ei:.035,au:0,y:"2014",lb:"Pete's sire"},
+  {id:"MOAT NANCY",ri:3,an:12,ei:.03,au:0,y:"2016",lb:"Pete's dam"},
+];
+const LL=[["HEATHER POINT","BEST MAN","sire of"],["BETTER GET ON","BEST MAN","dam of"],["BEST MAN","SWANKY STAR","sire of"],["BEST MAN","FIVE TO EIGHT","sire of"],["BEST MAN","LONG BAR","sire of"],["BEST MAN","SMOKEY KATE","sire of"],["SMOKEY FLAVOUR","FIVE TO EIGHT","dam of"],["SMOKEY FLAVOUR","SMOKEY KATE",""],["CAREFUL PAT","SMOKEY FLAVOUR",""],["BALLYGLASS LUNDY","CAREFUL PAT",""],["BALLYGLASS LUNDY","CRAFTY THRILLER",""],["BEST MAN","CRAFTY THRILLER","ancestor"],["MONALEE CHAMPION","HEATHER POINT","ancestor"],["MONALEE CHAMPION","FLYING MERRY",""],["HEATHER POINT","FLYING MERRY",""],["SWANKY STAR","CRAFTY THRILLER",""],["BEST MAN","DRIVE ON SMOKEY","ancestor (x8)"],["BEST MAN","MOAT NANCY","ancestor (x18)"],["DRIVE ON SMOKEY","BALLYMORE PETE","sire"],["MOAT NANCY","BALLYMORE PETE","dam"],["JAMAICA JANE","DRIVE ON SMOKEY","dam of"],["HONCHO CLASSIC","JAMAICA JANE",""],["ROANOKEE","JAMAICA JANE",""]];
+
+const el=document.getElementById("G");
+const W=Math.max(el.clientWidth||820,320),H=Math.max(W*0.85,340);
+const cx=W/2,cy=H/2;
+const sc=Math.min(W,H)/720;
+const R=[0,140*sc,270*sc,380*sc];
+
+const sv=d3.select("#G").append("svg").attr("viewBox",`0 0 ${W} ${H}`);
+const g=sv.append("g");
+sv.call(d3.zoom().scaleExtent([.4,4]).on("zoom",e=>g.attr("transform",e.transform)));
+
+["Inner Circle","Extended Network","Pete's World"].forEach((t,i)=>{
+  g.append("circle").attr("cx",cx).attr("cy",cy).attr("r",R[i+1]).attr("fill","none").attr("stroke","#1a2e1a").attr("stroke-width",.5).attr("stroke-dasharray","4,4");
+  g.append("text").attr("x",cx).attr("y",cy-R[i+1]+12*sc).attr("text-anchor","middle").attr("font-size",8*sc).attr("fill","#2a4a2a").attr("font-weight",600).text(t);
+});
+
+const nm={};
+NN.forEach(n=>{const r=R[n.ri],a=(n.an-90)*Math.PI/180;n.x=cx+Math.cos(a)*r;n.y=cy+Math.sin(a)*r;nm[n.id]=n;});
+
+LL.forEach(l=>{const s=nm[l[0]],t=nm[l[1]];if(!s||!t)return;const ip=l[1]==="BALLYMORE PETE"||l[0]==="BALLYMORE PETE"||l[2].includes("ancestor");const ia=s.au||t.au;
+  g.append("line").attr("x1",s.x).attr("y1",s.y).attr("x2",t.x).attr("y2",t.y).attr("stroke",ip?"#2e7d32":ia?"#5a4a00":"#1a3a1a").attr("stroke-width",(ip?2:1)*sc).attr("opacity",ip?.8:.45).attr("stroke-dasharray",ip?"":"3,3");
+  if(l[2]&&(ip||l[2].includes("sire")||l[2].includes("dam"))){const mx=(s.x+t.x)/2,my=(s.y+t.y)/2;g.append("text").attr("x",mx).attr("y",my-4*sc).attr("text-anchor","middle").attr("font-size",7*sc).attr("fill","#3a5a3a").attr("font-weight",500).text(l[2]);}
+});
+
+const tt=document.getElementById("T");
+NN.forEach(n=>{
+  const ie=n.id==="BEST MAN",ip=n.id==="BALLYMORE PETE";
+  const r=(ie?40:ip?26:Math.sqrt(n.ei)*52+6)*sc;
+  const fi=ie?"#a5d6a7":ip?"#a5d6a7":n.au?"#fff8e1":"#1a3a1a";
+  const st=ie?"#2e7d32":ip?"#2e7d32":n.au?"#f9a825":"#388e3c";
+  const ng=g.append("g").attr("transform",`translate(${n.x},${n.y})`).attr("cursor","pointer");
+  if(ie){ng.append("circle").attr("r",r+10*sc).attr("fill","none").attr("stroke","#388e3c").attr("stroke-width",.5).attr("opacity",.4);ng.append("circle").attr("r",r+20*sc).attr("fill","none").attr("stroke","#388e3c").attr("stroke-width",.3).attr("opacity",.2);}
+  ng.append("circle").attr("r",r).attr("fill",fi).attr("stroke",st).attr("stroke-width",(ie?3:ip?2:1.5)*sc);
+  if(ie)ng.append("text").attr("text-anchor","middle").attr("dy",-2*sc).attr("font-size",18*sc).text("\u{1F451}");
+  ng.append("text").attr("text-anchor","middle").attr("y",r+14*sc).attr("font-size",(ie?12:ip?11:n.ei>.15?9.5:8)*sc).attr("font-weight",n.ei>.12?700:500).attr("fill",ie?"#a5d6a7":ip?"#a5d6a7":n.au?"#f9a825":"#6a8f6a").text(n.id);
+  ng.append("text").attr("text-anchor","middle").attr("y",r+26*sc).attr("font-size",7*sc).attr("fill","#4a6a4a").text(n.lb);
+  ng.on("mouseenter",e=>{const ed=E.find(x=>x.n===n.id),bd=B.find(x=>x.n===n.id);tt.innerHTML=`<div class="tn">${n.id}</div><div>Whelped: ${n.y}</div><div class="ts">Eigenvector: ${n.ei.toFixed(4)}</div>`+(bd?`<div>Betweenness: ${bd.s.toFixed(4)}</div>`:"")+(ed?`<div class="tw">${ed.r}</div>`:n.lb?`<div class="tw">${n.lb}</div>`:"");tt.style.opacity=1;tt.style.left=Math.min(e.clientX+16,window.innerWidth-290)+"px";tt.style.top=(e.clientY-8)+"px";}).on("mousemove",e=>{tt.style.left=Math.min(e.clientX+16,window.innerWidth-290)+"px";tt.style.top=(e.clientY-8)+"px";}).on("mouseleave",()=>{tt.style.opacity=0;});
+});
+
+function rk(d,ti,q,c,m){let h=`<div class="rs"><h3>${ti}</h3><p class="q">${q}</p>`;d.forEach((x,i)=>{const p=x.s/m*100;const au=x.a?' <span class="aus">\u{1F998}</span>':"";h+=`<div class="rr"><div class="rn">${i+1}</div><div class="rm">${x.n}${au} <span class="yr">${x.y}</span></div><div class="bw"><div class="br" style="width:${p}%;background:${c}"></div></div><div class="sc">${x.s.toFixed(4)}</div></div>`;});return h+"</div>";}
+
+document.getElementById("S").innerHTML=`
+<div class="cb"><h3>What on earth is an EigenPete?</h3>
+<p>Pete's family tree has <strong>1,828 slots</strong> across 10 generations, but only <strong>477 unique dogs</strong> fill them. The same dogs keep showing up again and again. When we collapse all those duplicates, the tree stops being a tree and becomes a <em>network</em> \u2014 a web of 477 dogs connected by 663 parent-child relationships.</p>
+<p>Now the question: <strong>which dog in that web matters most?</strong></p>
+<p>Not just "who shows up the most" \u2014 BALLYGLASS LUNDY appears a staggering 37 times but ranks only #6. Showing up a lot is like being at every party in town. We want something deeper: <strong>who knows all the important people, whose important friends also know important people?</strong></p>
+<p>That's <em>eigenvector centrality</em>. Every dog gets a score based on the scores of the dogs they're connected to. It's beautifully recursive \u2014 importance feeds on importance. A dog connected to five nobodies scores low. A dog connected to five superstars scores through the roof.</p>
+<div class="co"><strong>Think of it this way:</strong> BALLYGLASS LUNDY is the lad who turns up to every coursing match in the county (37 times!). But <em>BEST MAN</em> is the one who trained half the dogs on the field and his father trained the other half. He's not just at the coursing meet. He's the reason there <strong>is</strong> a coursing meet.</div>
+<p>This is the same maths Google used to decide which websites matter most. A page linked by important pages outranks one linked by obscure blogs. In Pete's web, <em>BEST MAN</em> scores <code>0.362</code> \u2014 55% higher than the runner-up. Six of the top 15 dogs are his direct parents or children. He doesn't just participate in Pete's bloodline. He <strong>organises</strong> it.</p></div>
+
+<div class="cb"><h3>Three questions, three different answers</h3>
+<p>Each centrality measure asks something different about the network. Same 477 dogs, same 663 connections \u2014 completely different winners:</p>
+<div class="co"><strong>Eigenvector:</strong> "Who's connected to the best-connected dogs?"<br>\u2192 <em>BEST MAN</em>. The nucleus. The EigenPete.<br><br>
+<strong>Betweenness:</strong> "If one dog were deleted from history, which loss would shatter the network into the most pieces?"<br>\u2192 <em>MONALEE CHAMPION</em> (1964). The ancient crossroads where every bloodline passes through. He's the roundabout in the middle of rural Ireland \u2014 take him out and nobody can get anywhere.<br><br>
+<strong>PageRank:</strong> "Follow the flow of genetics forward through time. Where does it all end up?"<br>\u2192 <em>BALLYMORE PETE</em> himself. He's the river mouth where all 477 tributaries converge. Every dog in this network exists, from Pete's perspective, to make Pete.</div></div>
+
+<div class="cb"><h3>How we built this</h3>
+<p><strong>1.</strong> Took Pete's 1,828-slot pedigree tree (from the ICC Stud Book) and collapsed duplicate entries into <strong>477 unique nodes</strong>.</p>
+<p><strong>2.</strong> Drew an edge between every parent and child, creating a graph with <strong>663 edges</strong>.</p>
+<p><strong>3.</strong> Built the <strong>adjacency matrix</strong> A \u2014 a 477\u00d7477 grid where cell (i,j) = 1 if dogs i and j are directly related.</p>
+<p><strong>4.</strong> Found the <strong>eigenvector</strong> of A belonging to its largest eigenvalue. Each dog's component in this vector is its centrality score.</p>
+<p><strong>5.</strong> The dog with the highest score is the <em>EigenPete</em>: the single most structurally important node in Pete's entire genetic network.</p>
+<p style="color:#5a7a5a;font-size:11px;margin-top:8px">Tools: Python, NetworkX, D3.js. Data: 547 dogs crawled from irishcoursingclub.ie, pruned to 10 generations.</p></div>
+
+<div class="lr"><div class="ld" style="background:#a5d6a7;border:2px solid #2e7d32"></div> EigenPete / Pete</div>
+<div class="lr"><div class="ld" style="background:#1a3a1a;border:2px solid #388e3c"></div> Irish ancestor (size = eigenvector score)</div>
+<div class="lr"><div class="ld" style="background:#fff8e1;border:2px solid #f9a825"></div> Australian import</div>
+<div class="lr" style="margin-bottom:20px"><div style="width:20px;height:2px;background:#2e7d32"></div> Direct path to Pete (solid line)</div>
+${rk(E,"Eigenvector Centrality","Who is most connected to the best-connected dogs?","#388e3c",E[0].s)}
+${rk(B,"Betweenness Centrality","Remove one dog and the network fragments. Who?","#f9a825",B[0].s)}
+${rk(P,"PageRank","Follow genetic flow forward through time. Who receives?","#6a8f6a",P[0].s)}
+`;
+</script>
+</body>
+</html>
