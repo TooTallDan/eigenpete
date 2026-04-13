@@ -97,6 +97,15 @@
   body.dark .n-name-radial{fill:#ddd}
   body.dark .n-detail-radial{fill:#777}
   body.dark .ring-label{fill:#444}
+
+  @media(max-width:640px){
+    #header{width:100%;padding:8px 12px;border-bottom:none}
+    #header .sub{display:none}
+    #toolbar{top:auto;top:unset;position:fixed;top:34px;left:0;right:0;width:100%;justify-content:center;padding:5px 8px;border-bottom:1px solid #eee;flex-wrap:wrap}
+    body.dark #toolbar{border-bottom-color:#333}
+    #stats-box{top:72px}
+    #tree-container{padding-top:68px}
+  }
 </style>
 </head>
 <body>
